@@ -11,24 +11,9 @@
     </style>
 </head>
 <body>
-    <img src="/static/arrowsOpenrot.png" id="Taller" class="cctl">
-    <img src="/static/arrowsCloserot.png" id="Shorter" class="cctl">
-    <img src="/static/arrowsOpen.png" id="Wider" class="cctl">
-    <img src="/static/arrowsClose.png" id="Thinner" class="cctl"><br>
-    <canvas id="eatfishdisplay" height="500px" width="1000px"></canvas><br>
-    <span id="playerSpeedSpan"> Player Speed:<span id="playerSpeed">35</span></span>
-    <button id="startButton">Start!</button>
-    <span id="enemySpeedSpan"> Enemy Speed:<span id="enemySpeed">1.0</span></span><br>
-    <h4>Welcome to the greatest game ever</h4>
-    Increase player speed with 'Page Up'<br>
-    Decrease player speed with 'Page Down'<br>
-    Increase enemy speed with 'Home'<br>
-    Decrease enemy speed with 'End'<br>
+    <br>
+    <canvas id="eatfishdisplay"></canvas><br>
+    <button id="startButton">Start!</button><br><br>
     Move with arrow keys
-    <script src="/games/eatfishsetup.js"></script>
-    <script src="/games/eatfishentities.js"></script>
-    <script src="/games/eatfishcomponents.js"></script>
-    <script src="/games/eatfishsystems.js"></script>
-    <script src="/games/eatfishengine.js"></script>
-    <script>document.getElementById("startButton").onclick = startGame;</script>
+    <script src="eatfish.js" type="module"></script>
 </body>

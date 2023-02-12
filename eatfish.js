@@ -1,3 +1,138 @@
+// Started with this example: http://vasir.net/blog/game-development/how-to-build-entity-component-system-in-javascript
+
+// setup
+
+var ECS = {};
+var canvas = document.getElementById("eatfishdisplay");
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth - 50;
+  canvas.height = window.innerHeight - 150;
+}
+resizeCanvas();
+
+addEventListener('resize', (e) => resizeCanvas());
+
+var maxPlayerSpeed = 2.5;
+var enemySpeed = 1;
+
+function checkVal(val, funcName) {
+    if (val === undefined) {throw funcName + " given no value";}
+}
+
+var gameLevel = {
+    centerPos: {x: 0, y: 0},
+    levelSize: {width: 6000, height: 4000}
+};
+
+gameLevel.updateCenter = function updateCenter(pos) {
+    var leftBound = canvas.width / (2 * screenSize);
+    var rightBound = this.levelSize.width - canvas.width / (2 * screenSize);
+    var topBound = canvas.height / (2 * screenSize);
+    var bottomBound = this.levelSize.height - canvas.height / (2 * screenSize);
+    this.centerPos.x = pos.x;
+    this.centerPos.y = pos.y;
+    if (canvas.width > this.levelSize.width * screenSize) {
+        this.centerPos.x = this.levelSize.width / 2;
+    } else if (pos.x < leftBound) {
+        this.centerPos.x = leftBound;
+    } else if (pos.x > rightBound) {
+        this.centerPos.x = rightBound;
+    }
+    if (canvas.height > this.levelSize.height * screenSize) {
+        this.centerPos.y = this.levelSize.height / 2;
+    } else if (pos.y < topBound) {
+        this.centerPos.y = topBound;
+    } else if (pos.y > bottomBound) {
+        this.centerPos.y = bottomBound;
+    }
+};
+
+// entities
+
+ECS.Entity = function Entity() {
+  this.id = ++ECS.Entity.prototype.idNum;
+  ECS.Entity.prototype._count++;
+  this.components = {};
+}
+// Numbers to be used as ids
+ECS.Entity.prototype.idNum = 0;
+// Entity count
+ECS.Entity.prototype._count = 0;
+
+ECS.Entity.prototype.addComponent = function addComponent(component) {
+  this.components[component.name] = component;
+  return this;
+};
+
+ECS.Entity.prototype.removeComponent = function removeComponent(componentName) {
+  delete this.components[componentName];
+  return this;
+};
+
+// components
+
+ECS.Components = {};
+
+function hasComponent(entity, componentName) {
+    var component = entity.components[componentName];
+    if (component && component.value) {
+        return true;
+    }
+}
+
+ECS.Components.Size = function componentSize(value) {
+    checkVal(value, "componentSize");
+    this.value = value;
+    return this;
+};
+ECS.Components.Size.prototype.name = "size";
+
+ECS.Components.Color = function componentColor(color) {
+    color = color || "#ff6633";
+    this.value = color;
+    return this;
+};
+ECS.Components.Color.prototype.name = "color";
+
+ECS.Components.Position = function componentPosition(pos) {
+    checkVal(pos, "componentPosition");
+    this.x = pos[0];
+    this.y = pos[1];
+    return this;
+};
+ECS.Components.Position.prototype.name = "position";
+
+ECS.Components.Vector = function componentVector(vector) {
+    checkVal(vector, "componentVector");
+    this.x = vector[0];
+    this.y = vector[1];
+    return this;
+};
+ECS.Components.Vector.prototype.name = "vector";
+
+ECS.Components.PlayerControl = function componentPlayerControl(bool) {
+    if (bool === false) {
+        this.value = false;
+    } else {
+        this.value = true;
+    }
+    return this;
+};
+ECS.Components.PlayerControl.prototype.name = "playerControl";
+
+ECS.Components.Dead = function componentDead(bool) {
+    if (bool === false) {
+        this.value = false;
+    } else {
+        this.value = true;
+    }
+    return this;
+};
+ECS.Components.Dead.prototype.name = "dead";
+
+// systems
+
 var context = canvas.getContext("2d");
 ECS.Systems = {};
 var screenSize = 1;
@@ -111,8 +246,8 @@ ECS.Systems.Input = function systemInput(entities) {
         if (!hasComponent(entity, 'playerControl')){
             continue;
         }
-        keys = ECS.Systems.Input.keys;
-        vector = entity.components.vector;
+        var keys = ECS.Systems.Input.keys;
+        var vector = entity.components.vector;
         // x^2 + y^2 < 3^2
         // Normalizing diagonal movement
         if (Math.pow(vector.x, 2) + Math.pow(vector.y, 2) > Math.pow(maxPlayerSpeed, 2)) {
@@ -193,6 +328,100 @@ ECS.Systems.AI = function systemAI(entities) {
     }
 };
 
+// engine
 
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+function checkDistance(pos1, pos2) {
+  var a = Math.abs(pos1.x - pos2.x);
+  var b = Math.abs(pos1.y - pos2.y);
+  return Math.sqrt(a*a + b*b);
+}
+
+function entityDistance(entity1, entity2) {
+  return checkDistance(entity1.components.position, entity2.components.position);
+}
+
+function entityTooClose(entity1, entity2, buffer) {
+  if (buffer === undefined) {
+      buffer = 0;
+  }
+  var size1 = entity1.components.size.value;
+  var size2 = entity2.components.size.value;
+  var dist = entityDistance(entity1, entity2);
+  if (dist > size1 + size2 + buffer) {
+      return false;
+  }
+  return true;
+}
+
+function spawnEnemies(number, minSize, maxSize) {
+  for (var i = 0; i < number; i++) {
+      var goodPlacement = false;
+      var attempts = 0;
+      var maxAttempts = 500;
+      var levelSize = gameLevel.levelSize;
+      while (!goodPlacement && attempts < maxAttempts) {
+          goodPlacement = true;
+          var entity = new ECS.Entity();
+          var entitySize = randomInt(minSize, maxSize);
+          entity.addComponent(new ECS.Components.Size(entitySize));
+          entity.addComponent(new ECS.Components.Color("blue"));
+          var entityX = randomInt(entitySize + 5, levelSize.width - entitySize - 5);
+          var entityY = randomInt(entitySize + 5, levelSize.height - entitySize - 5);
+          entity.addComponent(new ECS.Components.Position([entityX, entityY]));
+          entity.addComponent(new ECS.Components.Vector([0, 0]));
+          for (var eid in ECS.Entities) {
+              if (entityTooClose(ECS.Entities[eid], entity, 100)) {
+                  goodPlacement = false;
+              }
+          }
+          attempts++;
+      }
+      if (attempts < maxAttempts) {
+          ECS.Entities[entity.id] = entity;
+      } else {
+          console.log("Failed to place entity, no space.");
+      }
+  }
+}
+
+var systems = [ECS.Systems.Input, ECS.Systems.AI, ECS.Systems.Move, ECS.Systems.Kill, ECS.Systems.Draw];
+var animationFrameId;
+
+function gameLoop() {
+  for (var i=0; i < systems.length; i++){
+      systems[i](ECS.Entities);
+  }
+  animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+  }
+  ECS.Entities = {};
+  ECS.Entity.prototype.idNum = 0;
+  ECS.Entity.prototype._count = 0;
+  screenSize = 1;
+  screenSizeWanted = 1;
+  var entity = new ECS.Entity();
+  entity.addComponent(new ECS.Components.Size(40));
+  entity.addComponent(new ECS.Components.Color());
+  entity.addComponent(new ECS.Components.Position([gameLevel.levelSize.width / 2, gameLevel.levelSize.height / 2]));
+  entity.addComponent(new ECS.Components.Vector([0, 0]));
+  entity.addComponent(new ECS.Components.PlayerControl(true));
+  gameLevel.updateCenter(entity.components.position);
+  ECS.Entities[entity.id] = entity;
+  
+  spawnEnemies(150, 20, 35);
+  spawnEnemies(100, 45, 150);
+  
+  gameLoop();
+}
+
+document.getElementById("startButton").onclick = startGame;
 
 
